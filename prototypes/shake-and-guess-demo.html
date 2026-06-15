@@ -1,0 +1,345 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>盲盒摇摇乐 · Web Demo</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; user-select:none; }
+  :root{
+    --bg:#FBF3E7; --card:#FFFFFF; --ink:#3A3330; --sub:#8C8178;
+    --mint:#9FE3CB; --mint-d:#3FA683; --pink:#F6B8CE; --pink-d:#D95E8C;
+    --yellow:#FBD96B; --yellow-d:#E0A91E; --lilac:#C9BEF0; --lilac-d:#7C6BC9;
+    --good:#3FA683; --bad:#E07A6B; --line:rgba(58,51,48,.10);
+  }
+  html,body{height:100%;}
+  body{
+    font-family:-apple-system,"PingFang SC","Helvetica Neue",sans-serif;
+    background:var(--bg); color:var(--ink);
+    display:flex; justify-content:center; align-items:center; min-height:100vh; padding:14px;
+  }
+  .phone{
+    width:100%; max-width:420px; height:min(860px,96vh); background:var(--bg);
+    border-radius:30px; position:relative; overflow:hidden;
+    box-shadow:0 18px 50px rgba(58,51,48,.18); display:flex; flex-direction:column;
+  }
+  .screen{ position:absolute; inset:0; display:none; flex-direction:column; padding:22px 20px; overflow-y:auto; }
+  .screen.on{ display:flex; }
+
+  h1{ font-size:26px; font-weight:800; letter-spacing:.5px; }
+  .tag{ font-size:13px; color:var(--sub); margin-top:4px; }
+  .btn{
+    border:none; border-radius:16px; padding:15px; font-size:16px; font-weight:700;
+    cursor:pointer; transition:transform .08s, filter .15s; width:100%; color:#fff;
+  }
+  .btn:active{ transform:scale(.97); }
+  .btn.primary{ background:var(--pink-d); }
+  .btn.mint{ background:var(--mint-d); }
+  .btn.ghost{ background:transparent; color:var(--sub); font-weight:600; }
+  .btn.yellow{ background:var(--yellow-d); }
+  .btn:disabled{ filter:grayscale(.6) opacity(.5); cursor:default; }
+
+  /* ---------- HOME ---------- */
+  #home{ justify-content:space-between; }
+  .hero{ flex:1; display:flex; flex-direction:column; justify-content:center; align-items:center; gap:18px; }
+  .hero-box{ width:120px; height:120px; border-radius:26px; background:var(--lilac); display:flex; align-items:center; justify-content:center; box-shadow:0 10px 24px rgba(124,107,201,.3); animation:float 2.6s ease-in-out infinite; }
+  .hero-box .qm{ font-size:60px; font-weight:800; color:#fff; }
+  @keyframes float{ 0%,100%{ transform:translateY(0) rotate(-3deg);} 50%{ transform:translateY(-12px) rotate(3deg);} }
+  .dex-bar{ background:var(--card); border-radius:16px; padding:14px 16px; display:flex; justify-content:space-between; align-items:center; margin-top:8px; }
+  .dex-bar .num{ font-size:20px; font-weight:800; color:var(--lilac-d); }
+
+  /* ---------- GAME ---------- */
+  .topbar{ display:flex; justify-content:space-between; align-items:center; margin-bottom:6px; }
+  .topbar .theme{ font-size:17px; font-weight:800; }
+  .topbar .progress{ font-size:13px; color:var(--sub); }
+  .hint{ font-size:13px; color:var(--sub); text-align:center; margin:6px 0 12px; line-height:1.5; }
+  .boxrow{ display:grid; grid-template-columns:repeat(3,1fr); gap:12px; margin-bottom:14px; }
+  .box{ aspect-ratio:1; border-radius:18px; background:var(--card); border:2.5px solid transparent; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:4px; cursor:pointer; position:relative; transition:transform .1s, border-color .15s; }
+  .box.sel{ border-color:var(--pink-d); transform:translateY(-3px); }
+  .box.done{ background:#F4EEE6; }
+  .box .bid{ font-size:13px; color:var(--sub); font-weight:700; }
+  .box .ico{ font-size:30px; }
+  .box .pick{ font-size:12px; font-weight:700; color:var(--mint-d); text-align:center; padding:0 4px; line-height:1.2; }
+  .box.shaking{ animation:shake .5s ease; }
+  @keyframes shake{ 0%,100%{transform:translateX(0);} 20%{transform:translateX(-6px) rotate(-4deg);} 40%{transform:translateX(6px) rotate(4deg);} 60%{transform:translateX(-5px) rotate(-3deg);} 80%{transform:translateX(5px) rotate(3deg);} }
+
+  .stage{ background:var(--card); border-radius:20px; padding:16px; margin-bottom:12px; min-height:150px; display:flex; flex-direction:column; }
+  .stage .which{ font-size:14px; color:var(--sub); margin-bottom:10px; }
+  .stage .which b{ color:var(--ink); }
+  .shake-btn{ background:var(--yellow); border:none; border-radius:16px; padding:16px; font-size:17px; font-weight:800; color:var(--ink); cursor:pointer; transition:transform .08s; }
+  .shake-btn:active{ transform:scale(.96); }
+  .shake-btn:disabled{ filter:grayscale(.5) opacity(.6); }
+  .shake-meta{ font-size:12px; color:var(--sub); text-align:center; margin-top:8px; }
+  .sound-wave{ height:34px; display:flex; align-items:center; justify-content:center; gap:3px; margin:10px 0; }
+  .sound-wave span{ width:4px; height:8px; background:var(--lilac-d); border-radius:2px; }
+  .sound-wave.play span{ animation:wave .6s ease-in-out infinite; }
+  .sound-wave span:nth-child(2){animation-delay:.1s} .sound-wave span:nth-child(3){animation-delay:.2s}
+  .sound-wave span:nth-child(4){animation-delay:.3s} .sound-wave span:nth-child(5){animation-delay:.15s}
+  .sound-wave span:nth-child(6){animation-delay:.25s} .sound-wave span:nth-child(7){animation-delay:.05s}
+  @keyframes wave{ 0%,100%{height:8px} 50%{height:28px} }
+
+  .choices{ display:grid; grid-template-columns:repeat(2,1fr); gap:8px; }
+  .choice{ background:#F4EEE6; border:2px solid transparent; border-radius:12px; padding:11px 8px; font-size:13px; font-weight:700; cursor:pointer; display:flex; align-items:center; gap:6px; transition:.12s; }
+  .choice .ci{ font-size:18px; }
+  .choice.sel{ border-color:var(--mint-d); background:#E6F6EF; }
+  .choice:active{ transform:scale(.97); }
+
+  /* ---------- RESULT ---------- */
+  #result{ justify-content:center; align-items:center; text-align:center; gap:14px; }
+  .rate-ring{ width:150px; height:150px; border-radius:50%; display:flex; flex-direction:column; align-items:center; justify-content:center; color:#fff; }
+  .rate-ring .pct{ font-size:42px; font-weight:800; }
+  .rate-ring .lbl{ font-size:14px; font-weight:700; }
+  .verdict{ font-size:22px; font-weight:800; }
+  .reveal{ display:grid; grid-template-columns:repeat(3,1fr); gap:8px; width:100%; }
+  .rcell{ background:var(--card); border-radius:12px; padding:8px 4px; font-size:11px; }
+  .rcell .ico{ font-size:22px; }
+  .rcell .ok{ color:var(--good); font-weight:700; }
+  .rcell .no{ color:var(--bad); font-weight:700; }
+  .hidden-pop{ background:var(--lilac); color:#fff; border-radius:14px; padding:10px 16px; font-weight:800; font-size:15px; }
+
+  .toast{ position:absolute; bottom:24px; left:50%; transform:translateX(-50%); background:var(--ink); color:#fff; padding:10px 18px; border-radius:20px; font-size:13px; opacity:0; transition:opacity .25s; pointer-events:none; white-space:nowrap; z-index:50; }
+  .toast.on{ opacity:.94; }
+  .footer-note{ font-size:11px; color:var(--sub); text-align:center; margin-top:auto; padding-top:10px; }
+</style>
+</head>
+<body>
+<div class="phone">
+
+  <!-- HOME -->
+  <section class="screen on" id="home">
+    <div style="text-align:center;">
+      <h1>盲盒摇摇乐</h1>
+      <div class="tag">Shake & Guess · 听声辨物 Demo</div>
+    </div>
+    <div class="hero">
+      <div class="hero-box"><span class="qm">?</span></div>
+      <div style="text-align:center; font-size:14px; color:var(--sub); line-height:1.6;">
+        摇一摇盒子，用耳朵猜里面是什么<br>一组 6 个，猜对 4 个（60%）整组收走
+      </div>
+    </div>
+    <div class="dex-bar">
+      <div><div style="font-size:13px;color:var(--sub)">已收集图鉴</div></div>
+      <div class="num" id="dexCount">0 套</div>
+    </div>
+    <button class="btn primary" style="margin-top:14px;" onclick="startGame()">开一套盲盒</button>
+    <div class="footer-note">音效由浏览器实时合成 · 戴耳机体验更佳</div>
+  </section>
+
+  <!-- GAME -->
+  <section class="screen" id="game">
+    <div class="topbar">
+      <div class="theme">桌面小物 · 第 1 套</div>
+      <div class="progress" id="prog">已押 0 / 6</div>
+    </div>
+    <div class="hint">点盒子选中它 → 摇一摇听声 → 也可以摇别的盒对比 → 给它押个答案</div>
+    <div class="boxrow" id="boxrow"></div>
+
+    <div class="stage">
+      <div class="which" id="whichBox">先点上方一个盒子</div>
+      <div class="sound-wave" id="wave"><span></span><span></span><span></span><span></span><span></span><span></span><span></span></div>
+      <button class="shake-btn" id="shakeBtn" disabled onclick="shakeCurrent()">摇一摇 🤛</button>
+      <div class="shake-meta" id="shakeMeta">　</div>
+      <div style="font-size:13px;color:var(--sub);margin:12px 0 8px;font-weight:700;">你猜这盒是：</div>
+      <div class="choices" id="choices"></div>
+    </div>
+
+    <button class="btn mint" id="confirmBtn" disabled onclick="confirmSet()">确认整组（还差 6 个）</button>
+    <button class="btn ghost" onclick="go('home')" style="margin-top:8px;">放弃这套</button>
+  </section>
+
+  <!-- RESULT -->
+  <section class="screen" id="result">
+    <div class="rate-ring" id="ring"><div class="pct" id="rpct">0%</div><div class="lbl">正确率</div></div>
+    <div class="verdict" id="verdict">—</div>
+    <div id="hiddenWrap"></div>
+    <div class="reveal" id="reveal"></div>
+    <div id="resultBtns" style="width:100%;display:flex;flex-direction:column;gap:8px;margin-top:6px;"></div>
+  </section>
+
+  <div class="toast" id="toast"></div>
+</div>
+
+<script>
+/* ============ 物品库（音效靠合成，不依赖素材） ============ */
+const ITEMS = [
+  { id:'metal',  name:'金属钥匙扣', ico:'🔑', sound:'metal'  },
+  { id:'soft',   name:'软胶公仔',   ico:'🧸', sound:'soft'   },
+  { id:'plush',  name:'毛绒挂件',   ico:'🐰', sound:'plush'  },
+  { id:'beads',  name:'豆袋小件',   ico:'🫘', sound:'beads'  },
+  { id:'heavy',  name:'金属摆件',   ico:'🗿', sound:'heavy'  },
+  { id:'card',   name:'卡片纸品',   ico:'🃏', sound:'card'   },
+];
+const HIDDEN = { id:'hidden', name:'隐藏款', ico:'👑' };
+const CFG = { boxCount:6, freeShakes:3, passRate:0.6, hiddenBase:0.18 }; // demo隐藏款概率调高便于体验
+
+/* ============ Web Audio 音效合成 ============ */
+let AC=null;
+function ac(){ if(!AC) AC=new (window.AudioContext||window.webkitAudioContext)(); if(AC.state==='suspended') AC.resume(); return AC; }
+function env(g,t,a,d,peak){ g.gain.setValueAtTime(0,t); g.gain.linearRampToValueAtTime(peak,t+a); g.gain.exponentialRampToValueAtTime(0.0001,t+a+d); }
+function noiseBuf(dur){ const c=ac(); const n=c.sampleRate*dur; const b=c.createBuffer(1,n,c.sampleRate); const d=b.getChannelData(0); for(let i=0;i<n;i++) d[i]=Math.random()*2-1; return b; }
+
+function playSound(kind){
+  const c=ac(), t=c.currentTime;
+  if(kind==='metal'){ // 高频清脆叮叮 + 余音
+    [1568,2093,2637].forEach((f,i)=>{ const o=c.createOscillator(),g=c.createGain(); o.type='triangle'; o.frequency.value=f; env(g,t+i*0.06,0.002,0.5-i*0.1,0.25); o.connect(g).connect(c.destination); o.start(t+i*0.06); o.stop(t+i*0.06+0.6); });
+  } else if(kind==='soft'){ // 闷噗噗 短促
+    for(let i=0;i<2;i++){ const o=c.createOscillator(),g=c.createGain(); o.type='sine'; o.frequency.setValueAtTime(180,t+i*0.13); o.frequency.exponentialRampToValueAtTime(90,t+i*0.13+0.1); env(g,t+i*0.13,0.005,0.12,0.4); o.connect(g).connect(c.destination); o.start(t+i*0.13); o.stop(t+i*0.13+0.2);} 
+  } else if(kind==='plush'){ // 几乎无声 轻摩擦
+    const s=c.createBufferSource(); s.buffer=noiseBuf(0.4); const f=c.createBiquadFilter(); f.type='bandpass'; f.frequency.value=2500; f.Q.value=0.7; const g=c.createGain(); env(g,t,0.05,0.3,0.05); s.connect(f).connect(g).connect(c.destination); s.start(t); s.stop(t+0.45);
+  } else if(kind==='beads'){ // 哗啦啦 连续碎响
+    for(let i=0;i<14;i++){ const s=c.createBufferSource(); s.buffer=noiseBuf(0.05); const f=c.createBiquadFilter(); f.type='highpass'; f.frequency.value=4000; const g=c.createGain(); const tt=t+i*0.035+Math.random()*0.02; env(g,tt,0.001,0.04,0.18); s.connect(f).connect(g).connect(c.destination); s.start(tt); s.stop(tt+0.06);} 
+  } else if(kind==='heavy'){ // 沉闷咚 低频慢
+    const o=c.createOscillator(),g=c.createGain(); o.type='sine'; o.frequency.setValueAtTime(70,t); o.frequency.exponentialRampToValueAtTime(45,t+0.5); env(g,t,0.005,0.6,0.6); o.connect(g).connect(c.destination); o.start(t); o.stop(t+0.7);
+  } else if(kind==='card'){ // 沙沙滑动
+    const s=c.createBufferSource(); s.buffer=noiseBuf(0.5); const f=c.createBiquadFilter(); f.type='highpass'; f.frequency.value=6000; const g=c.createGain(); env(g,t,0.08,0.35,0.12); s.connect(f).connect(g).connect(c.destination); s.start(t); s.stop(t+0.55);
+  }
+}
+
+/* ============ 游戏状态 ============ */
+let state=null;
+function rand(n){ return Math.floor(Math.random()*n); }
+function shuffle(a){ for(let i=a.length-1;i>0;i--){ const j=rand(i+1); [a[i],a[j]]=[a[j],a[i]]; } return a; }
+
+function startGame(){
+  ac(); // 用户手势内激活音频
+  const boxes=[];
+  for(let i=0;i<CFG.boxCount;i++){ const it=ITEMS[rand(ITEMS.length)]; boxes.push({ real:it, guess:null, shakesLeft:CFG.freeShakes, adUsed:false }); }
+  state={ boxes, current:-1, round:1 };
+  renderBoxes(); selectBox(-1); updateProgress();
+  go('game');
+}
+
+function renderBoxes(){
+  const row=document.getElementById('boxrow'); row.innerHTML='';
+  state.boxes.forEach((b,i)=>{
+    const el=document.createElement('div'); el.className='box'+(state.current===i?' sel':'')+(b.guess?' done':'');
+    el.onclick=()=>selectBox(i);
+    el.innerHTML=`<div class="bid">${i+1}号</div>`+(b.guess?`<div class="ico">${b.guess.ico}</div><div class="pick">${b.guess.name}</div>`:`<div class="ico">📦</div>`);
+    if(state.shakingIdx===i) el.classList.add('shaking');
+    row.appendChild(el);
+  });
+}
+
+function selectBox(i){
+  state.current=i; renderBoxes();
+  const sb=document.getElementById('shakeBtn'), wb=document.getElementById('whichBox'),
+        meta=document.getElementById('shakeMeta'), ch=document.getElementById('choices');
+  if(i<0){ wb.textContent='先点上方一个盒子'; sb.disabled=true; meta.innerHTML='　'; ch.innerHTML=''; return; }
+  const b=state.boxes[i];
+  wb.innerHTML=`正在听 <b>${i+1}号盒</b>`;
+  sb.disabled=false;
+  meta.textContent=`剩余摇晃 ${b.shakesLeft} 次`;
+  renderChoices();
+}
+
+function renderChoices(){
+  const ch=document.getElementById('choices'); ch.innerHTML='';
+  const b=state.boxes[state.current];
+  ITEMS.forEach(it=>{
+    const el=document.createElement('div'); el.className='choice'+(b.guess&&b.guess.id===it.id?' sel':'');
+    el.innerHTML=`<span class="ci">${it.ico}</span>${it.name}`;
+    el.onclick=()=>{ b.guess=it; renderBoxes(); renderChoices(); updateProgress(); };
+    ch.appendChild(el);
+  });
+}
+
+function shakeCurrent(){
+  const i=state.current; if(i<0) return;
+  const b=state.boxes[i];
+  if(b.shakesLeft<=0){
+    if(!b.adUsed){ showAd('看广告 +2 次摇晃',()=>{ b.adUsed=true; b.shakesLeft+=2; selectBox(i); toast('已 +2 次摇晃'); }); }
+    else toast('这盒摇晃次数用完啦');
+    return;
+  }
+  b.shakesLeft--;
+  state.shakingIdx=i; renderBoxes();
+  const wave=document.getElementById('wave'); wave.classList.add('play');
+  playSound(b.real.sound);
+  setTimeout(()=>{ state.shakingIdx=null; renderBoxes(); wave.classList.remove('play'); },550);
+  document.getElementById('shakeMeta').textContent=`剩余摇晃 ${b.shakesLeft} 次`;
+}
+
+function updateProgress(){
+  const done=state.boxes.filter(b=>b.guess).length;
+  document.getElementById('prog').textContent=`已押 ${done} / ${CFG.boxCount}`;
+  const cb=document.getElementById('confirmBtn');
+  cb.disabled=done<CFG.boxCount;
+  cb.textContent=done<CFG.boxCount?`确认整组（还差 ${CFG.boxCount-done} 个）`:'确认整组 ✓';
+}
+
+function confirmSet(){
+  let correct=0;
+  state.boxes.forEach(b=>{ if(b.guess&&b.guess.id===b.real.id) correct++; });
+  const rate=correct/CFG.boxCount;
+  const pass=rate>=CFG.passRate;
+  showResult(rate,correct,pass);
+}
+
+function showResult(rate,correct,pass){
+  go('result');
+  const pct=Math.round(rate*100);
+  document.getElementById('rpct').textContent=pct+'%';
+  const ring=document.getElementById('ring');
+  ring.style.background=pass?'var(--mint-d)':'var(--bad)';
+  document.getElementById('verdict').textContent=pass?`整组收走！对 ${correct}/6`:`差一点，对 ${correct}/6`;
+
+  const rev=document.getElementById('reveal'); rev.innerHTML='';
+  state.boxes.forEach((b,i)=>{
+    const ok=b.guess&&b.guess.id===b.real.id;
+    const el=document.createElement('div'); el.className='rcell';
+    el.innerHTML=`<div class="bid" style="font-size:11px;color:var(--sub)">${i+1}号</div><div class="ico">${b.real.ico}</div><div class="${ok?'ok':'no'}">${ok?'✓ 对':'✗ '+(b.guess?b.guess.ico:'?')}</div>`;
+    rev.appendChild(el);
+  });
+
+  const hw=document.getElementById('hiddenWrap'); hw.innerHTML='';
+  const btns=document.getElementById('resultBtns'); btns.innerHTML='';
+
+  if(pass){
+    // 隐藏款判定
+    if(Math.random()<CFG.hiddenBase){ hw.innerHTML=`<div class="hidden-pop">🎉 触发隐藏款 ${HIDDEN.ico}！</div>`; }
+    state.dex=(state.dex||0); // demo内简单计数
+    addDex();
+    const b1=mkBtn('再开一套','primary',startGame); btns.appendChild(b1);
+    const b2=mkBtn('回首页','ghost',()=>go('home')); btns.appendChild(b2);
+  } else {
+    // 临界局给广告复活，否则打乱重听
+    if(correct===3){ // 50% 临界
+      const ad=mkBtn('看广告复活 · 重押 1 个','yellow',()=>{ showAd('看广告复活',()=>{ reviveOne(); }); }); btns.appendChild(ad);
+    }
+    const b1=mkBtn('打乱重听一轮','mint',scrambleRetry); btns.appendChild(b1);
+    const b2=mkBtn('放弃回首页','ghost',()=>go('home')); btns.appendChild(b2);
+  }
+}
+
+function mkBtn(txt,cls,fn){ const b=document.createElement('button'); b.className='btn '+cls; b.textContent=txt; b.onclick=fn; return b; }
+
+function scrambleRetry(){
+  // 物品不变，位置打乱；清空猜测、回满摇晃
+  shuffle(state.boxes);
+  state.boxes.forEach(b=>{ b.guess=null; b.shakesLeft=CFG.freeShakes; b.adUsed=false; });
+  state.round++; state.current=-1;
+  renderBoxes(); selectBox(-1); updateProgress();
+  go('game'); toast('盒子已打乱，重新听一轮');
+}
+
+function reviveOne(){
+  // 找一个押错的盒，给玩家回到游戏改它
+  go('game'); toast('回到游戏，改一个押错的盒再确认');
+}
+
+let dexCount=0;
+function addDex(){ dexCount++; document.getElementById('dexCount').textContent=dexCount+' 套'; }
+
+/* ============ 广告模拟 ============ */
+function showAd(label,cb){
+  toast(label+'…（模拟 2 秒）');
+  setTimeout(()=>{ cb&&cb(); },1400);
+}
+
+/* ============ 通用 ============ */
+function go(id){ document.querySelectorAll('.screen').forEach(s=>s.classList.remove('on')); document.getElementById(id).classList.add('on'); }
+let toastT;
+function toast(msg){ const t=document.getElementById('toast'); t.textContent=msg; t.classList.add('on'); clearTimeout(toastT); toastT=setTimeout(()=>t.classList.remove('on'),1800); }
+</script>
+</body>
+</html>

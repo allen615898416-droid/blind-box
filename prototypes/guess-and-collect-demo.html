@@ -1,0 +1,353 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>盲盒辨辨乐 · 核心玩法 Demo</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; user-select:none; }
+  :root{
+    --bg:#FBF3E7; --card:#FFFFFF; --ink:#3A3330; --sub:#8C8178;
+    --mint:#9FE3CB; --mint-d:#3FA683; --pink:#F6B8CE; --pink-d:#D95E8C;
+    --gold:#FBD96B; --gold-d:#E0A91E; --lilac:#C9BEF0; --lilac-d:#7C6BC9;
+    --good:#3FA683; --bad:#E07A6B; --gray:#D8D2C8; --gray-d:#A89F92;
+    --line:rgba(58,51,48,.10);
+  }
+  html,body{height:100%;}
+  body{
+    font-family:-apple-system,"PingFang SC","Helvetica Neue",sans-serif;
+    background:var(--bg); color:var(--ink);
+    display:flex; justify-content:center; align-items:center; min-height:100vh; padding:14px;
+  }
+  .phone{ width:100%; max-width:420px; height:min(880px,96vh); background:var(--bg);
+    border-radius:30px; position:relative; overflow:hidden;
+    box-shadow:0 18px 50px rgba(58,51,48,.18); display:flex; flex-direction:column; }
+  .screen{ position:absolute; inset:0; display:none; flex-direction:column; padding:22px 20px; overflow-y:auto; }
+  .screen.on{ display:flex; }
+  h1{ font-size:24px; font-weight:800; }
+  .tag{ font-size:13px; color:var(--sub); margin-top:4px; }
+  .btn{ border:none; border-radius:16px; padding:15px; font-size:16px; font-weight:700; cursor:pointer;
+    transition:transform .08s, filter .15s; width:100%; color:#fff; }
+  .btn:active{ transform:scale(.97); }
+  .btn.primary{ background:var(--pink-d); } .btn.mint{ background:var(--mint-d); }
+  .btn.gold{ background:var(--gold-d); } .btn.ghost{ background:transparent; color:var(--sub); font-weight:600; }
+  .btn:disabled{ filter:grayscale(.6) opacity(.5); cursor:default; }
+
+  .topbar{ display:flex; justify-content:space-between; align-items:center; margin-bottom:4px; }
+  .topbar .ttl{ font-size:17px; font-weight:800; }
+  .topbar .meta{ font-size:13px; color:var(--sub); }
+
+  /* WALL */
+  #wall{ }
+  .wall-grid{ display:grid; grid-template-columns:repeat(3,1fr); gap:12px; margin:14px 0; }
+  .cell{ aspect-ratio:1; border-radius:18px; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:6px; cursor:pointer; position:relative; transition:transform .1s; border:2px solid transparent; }
+  .cell:active{ transform:scale(.96); }
+  .cell.locked{ background:var(--gray); }
+  .cell.locked .q{ font-size:34px; color:var(--gray-d); font-weight:800; }
+  .cell.got{ background:var(--mint); border-color:var(--mint-d); }
+  .cell.gold{ background:#FBE9A8; border-color:var(--gold-d); }
+  .cell.gold.locked{ background:#F0E6C8; }
+  .cell .nm{ font-size:12px; font-weight:700; color:var(--ink); text-align:center; line-height:1.1; padding:0 2px; }
+  .cell .sym{ font-size:30px; }
+  .cell .star{ position:absolute; top:6px; right:8px; font-size:14px; color:var(--gold-d); }
+  .wall-hint{ font-size:13px; color:var(--sub); text-align:center; line-height:1.6; }
+  .progress-line{ font-size:13px; color:var(--sub); text-align:center; margin:6px 0; }
+
+  /* GAME */
+  .clue-banner{ background:#FBE9A8; border:1px solid var(--gold-d); color:#7a5a00; border-radius:12px; padding:8px 12px; font-size:13px; font-weight:700; text-align:center; margin-bottom:10px; display:none; }
+  .clue-banner.on{ display:block; }
+  .target-card{ background:var(--card); border-radius:16px; padding:12px 14px; margin-bottom:10px; display:flex; align-items:center; gap:12px; }
+  .target-card .big{ width:46px; height:46px; border-radius:12px; background:var(--mint); display:flex; align-items:center; justify-content:center; font-size:24px; }
+  .target-card .txt{ font-size:13px; color:var(--sub); } .target-card .txt b{ color:var(--ink); font-size:15px; }
+  .hint{ font-size:12px; color:var(--sub); text-align:center; margin:4px 0 10px; line-height:1.5; }
+
+  .boxrow{ display:grid; grid-template-columns:repeat(auto-fit,minmax(0,1fr)); gap:10px; margin-bottom:12px; }
+  .box{ aspect-ratio:.92; border-radius:16px; background:var(--card); border:2.5px solid transparent; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:3px; cursor:pointer; position:relative; transition:transform .1s, border-color .15s; }
+  .box.sel{ border-color:var(--lilac-d); transform:translateY(-3px); }
+  .box .bid{ font-size:11px; color:var(--sub); font-weight:700; }
+  .box .glyph{ width:40px; height:40px; display:flex; align-items:center; justify-content:center; }
+  .box .picklabel{ font-size:11px; font-weight:700; color:var(--lilac-d); text-align:center; line-height:1.05; padding:0 2px; }
+  .box.shaking{ animation:shake .5s ease; }
+  .box.shaking{ animation-name:shakeVar; animation-timing-function:ease; animation-iteration-count:infinite; }
+  @keyframes shakeVar{ 0%,100%{transform:translateX(0) rotate(0)} 25%{transform:translateX(calc(var(--amp,5px) * -1)) rotate(calc(var(--rot,3deg) * -1))} 50%{transform:translateX(var(--amp,5px)) rotate(var(--rot,3deg))} 75%{transform:translateX(calc(var(--amp,5px) * -0.6)) rotate(calc(var(--rot,3deg) * -0.6))} }
+  .windwrap{ position:relative; width:40px; height:40px; }
+  .wdot{ position:absolute; border-radius:50%; background:var(--lilac-d); opacity:.85; }
+
+  .stage{ background:var(--card); border-radius:18px; padding:14px; margin-bottom:12px; }
+  .stage .which{ font-size:13px; color:var(--sub); margin-bottom:8px; } .stage .which b{ color:var(--ink); }
+  .shake-btn{ background:var(--gold); border:none; border-radius:14px; padding:14px; font-size:16px; font-weight:800; color:var(--ink); cursor:pointer; width:100%; transition:transform .08s; }
+  .shake-btn:active{ transform:scale(.96); } .shake-btn:disabled{ filter:grayscale(.5) opacity(.6); }
+  .shake-meta{ font-size:12px; color:var(--sub); text-align:center; margin-top:6px; }
+  .wave{ height:30px; display:flex; align-items:center; justify-content:center; gap:3px; margin:8px 0; }
+  .wave span{ width:4px; height:8px; background:var(--lilac-d); border-radius:2px; }
+  .wave.play span{ animation:wv .6s ease-in-out infinite; }
+  .wave span:nth-child(2){animation-delay:.1s} .wave span:nth-child(3){animation-delay:.2s} .wave span:nth-child(4){animation-delay:.3s} .wave span:nth-child(5){animation-delay:.15s} .wave span:nth-child(6){animation-delay:.25s} .wave span:nth-child(7){animation-delay:.05s}
+  @keyframes wv{ 0%,100%{height:8px} 50%{height:26px} }
+  .choices{ display:grid; grid-template-columns:repeat(2,1fr); gap:8px; margin-top:6px; }
+  .choice{ background:#F4EEE6; border:2px solid transparent; border-radius:12px; padding:10px 8px; font-size:13px; font-weight:700; cursor:pointer; display:flex; align-items:center; gap:6px; transition:.12s; }
+  .choice.sel{ border-color:var(--mint-d); background:#E6F6EF; } .choice:active{ transform:scale(.97); }
+  .choice .cg{ width:20px; height:20px; }
+
+  /* RESULT */
+  #result{ justify-content:center; align-items:center; text-align:center; gap:14px; }
+  .ring{ width:140px; height:140px; border-radius:50%; display:flex; flex-direction:column; align-items:center; justify-content:center; color:#fff; }
+  .ring .big{ font-size:34px; font-weight:800; } .ring .lbl{ font-size:13px; }
+  .verdict{ font-size:21px; font-weight:800; }
+  .reveal{ display:grid; grid-template-columns:repeat(auto-fit,minmax(0,1fr)); gap:8px; width:100%; }
+  .rc{ background:var(--card); border-radius:12px; padding:8px 4px; font-size:11px; }
+  .rc .gl{ width:30px; height:30px; margin:2px auto; }
+  .rc .ok{ color:var(--good); font-weight:700; } .rc .no{ color:var(--bad); font-weight:700; }
+  .gold-pop{ background:var(--gold); color:#6a4e00; border-radius:14px; padding:10px 16px; font-weight:800; font-size:15px; }
+  .rbtns{ width:100%; display:flex; flex-direction:column; gap:8px; margin-top:6px; }
+
+  .toast{ position:absolute; bottom:22px; left:50%; transform:translateX(-50%); background:var(--ink); color:#fff; padding:10px 18px; border-radius:20px; font-size:13px; opacity:0; transition:opacity .25s; pointer-events:none; white-space:nowrap; z-index:50; }
+  .toast.on{ opacity:.94; }
+  .note{ font-size:11px; color:var(--sub); text-align:center; margin-top:auto; padding-top:10px; line-height:1.5; }
+</style>
+</head>
+<body>
+<div class="phone">
+
+  <!-- WALL -->
+  <section class="screen on" id="wall">
+    <div class="topbar"><div class="ttl">收集墙 · 四季的风</div><div class="meta" id="wallProg">0 / 5</div></div>
+    <div class="wall-hint">点一个还没收集的格子（带 ?）进入关卡，把它辨出来点亮它</div>
+    <div class="wall-grid" id="wallGrid"></div>
+    <div class="progress-line" id="goldLine">★ 金格是隐藏款：在关卡里随机遇到、辨对才能解锁</div>
+    <div class="note">这是核心玩法 demo · 美术为占位图形 · 验证「辨别 + 赌」是否好玩<br>建议戴耳机：风声差别要靠对比才听得出</div>
+  </section>
+
+  <!-- GAME -->
+  <section class="screen" id="game">
+    <div class="topbar"><div class="ttl" id="gameTtl">辨别关</div><div class="meta" id="gameProg">已押 0/4</div></div>
+    <div class="clue-banner" id="clueBanner">⚡ 这关藏了隐藏款！多了一个神秘的风，全辨对才能收走它</div>
+    <div class="target-card" id="targetCard">
+      <div class="big" id="targetGlyph"></div>
+      <div class="txt">你要找的目标：<b id="targetName">大风</b><br><span id="targetMode">在下面的盒子里找出它</span></div>
+    </div>
+    <div class="hint">点盒子选中 → 摇一摇（看它抖得凶不凶+听声）→ 摇别的盒对比 → 押一个答案</div>
+    <div class="boxrow" id="boxrow"></div>
+    <div class="stage">
+      <div class="which" id="whichBox">先点上方一个盒子</div>
+      <div class="wave" id="wave"><span></span><span></span><span></span><span></span><span></span><span></span><span></span></div>
+      <button class="shake-btn" id="shakeBtn" disabled onclick="shakeCur()">摇一摇 · 听风</button>
+      <div class="shake-meta" id="shakeMeta">　</div>
+      <div style="font-size:12px;color:var(--sub);margin:10px 0 6px;font-weight:700;">你猜这盒是哪种风：</div>
+      <div class="choices" id="choices"></div>
+    </div>
+    <button class="btn mint" id="confirmBtn" disabled onclick="confirmSet()">确认整组</button>
+    <button class="btn ghost" onclick="go('wall')" style="margin-top:6px;">放弃返回</button>
+  </section>
+
+  <!-- RESULT -->
+  <section class="screen" id="result">
+    <div class="ring" id="ring"><div class="big" id="ringBig">0/0</div><div class="lbl">押中</div></div>
+    <div class="verdict" id="verdict">—</div>
+    <div id="goldWrap"></div>
+    <div class="reveal" id="reveal"></div>
+    <div class="rbtns" id="rbtns"></div>
+  </section>
+
+  <div class="toast" id="toast"></div>
+</div>
+
+<script>
+/* ===== 四种风 + 隐藏款（demo：声音用合成，差别刻意做小=甜区） ===== */
+const WINDS = [
+  { id:'breeze', name:'微风', color:'#9FE3CB', freq:720, dur:0.6, gust:0.08 },
+  { id:'strong', name:'大风', color:'#7CB8E0', freq:430, dur:1.1, gust:0.55 },
+  { id:'valley', name:'山谷风', color:'#C9BEF0', freq:230, dur:1.8, gust:0.25 },
+  { id:'tornado',name:'龙卷风', color:'#E0A0B8', freq:160, dur:1.2, gust:1.0 },
+];
+const HIDDEN = { id:'typhoon', name:'台风', color:'#F2C45A', freq:110, dur:2.1, gust:1.4, hidden:true };
+const CFG = { freeShakes:4, hiddenChance:0.5 }; // 主线差别做大、探测4次=轻松首胜(C路线)
+
+/* ===== Web Audio 合成风声（靠 freq/dur/gust 区分，差别小 = 需要对比） ===== */
+let AC=null;
+function ac(){ if(!AC) AC=new (window.AudioContext||window.webkitAudioContext)(); if(AC.state==='suspended') AC.resume(); return AC; }
+function noiseBuf(dur){ const c=ac(); const n=c.sampleRate*dur; const b=c.createBuffer(1,n,c.sampleRate); const d=b.getChannelData(0); for(let i=0;i<n;i++) d[i]=Math.random()*2-1; return b; }
+function playWind(w){
+  const c=ac(), t=c.currentTime;
+  const s=c.createBufferSource(); s.buffer=noiseBuf(w.dur);
+  const f=c.createBiquadFilter(); f.type='bandpass'; f.frequency.value=w.freq; f.Q.value=2.5;
+  const g=c.createGain();
+  g.gain.setValueAtTime(0,t);
+  g.gain.linearRampToValueAtTime(0.4,t+0.15);
+  const steps=Math.floor(w.dur*10);
+  for(let i=0;i<steps;i++){ const tt=t+0.15+(i/steps)*(w.dur-0.2); const amp=0.25+Math.random()*w.gust*0.5; g.gain.linearRampToValueAtTime(Math.min(amp,0.6),tt); }
+  g.gain.linearRampToValueAtTime(0.0001,t+w.dur);
+  const lfo=c.createOscillator(), lg=c.createGain(); lfo.frequency.value=2+w.gust*6; lg.gain.value=w.freq*0.3;
+  lfo.connect(lg).connect(f.frequency); lfo.start(t); lfo.stop(t+w.dur);
+  s.connect(f).connect(g).connect(c.destination); s.start(t); s.stop(t+w.dur);
+}
+
+/* ===== 收集墙状态 ===== */
+let collected = {}; // id -> true
+function renderWall(){
+  const grid=document.getElementById('wallGrid'); grid.innerHTML='';
+  const all=[...WINDS, HIDDEN];
+  all.forEach(w=>{
+    const got=collected[w.id];
+    const el=document.createElement('div');
+    el.className='cell '+(w.hidden?'gold ':'')+(got?'got':'locked');
+    if(w.hidden){
+      el.innerHTML = got
+        ? `<div class="sym">${windGlyph(w,26)}</div><div class="nm">${w.name}</div><div class="star">★</div>`
+        : `<div class="q">★</div><div class="nm" style="color:var(--gold-d)">隐藏款</div>`;
+    } else {
+      el.innerHTML = got
+        ? `<div class="sym">${windGlyph(w,26)}</div><div class="nm">${w.name}</div>`
+        : `<div class="q">?</div>`;
+    }
+    if(!got && !w.hidden) el.onclick=()=>enterLevel(w);
+    else if(!got && w.hidden) el.onclick=()=>toast('隐藏款要在普通关卡里随机遇到');
+    else el.onclick=()=>toast(w.name+' 已收集');
+    grid.appendChild(el);
+  });
+  const gotCount=WINDS.filter(w=>collected[w.id]).length;
+  document.getElementById('wallProg').textContent=`${gotCount} / ${WINDS.length}`;
+  const goldGot=collected[HIDDEN.id];
+  document.getElementById('goldLine').textContent = goldGot ? '★ 隐藏款「台风」已收入！这面墙完美了 🎉' : '★ 金格是隐藏款：在关卡里随机遇到、辨对才能解锁';
+}
+function windGlyph(w,size){ return `<span style="display:inline-block;width:${size}px;height:${size}px;border-radius:50%;background:${w.color}"></span>`; }
+
+/* ===== 关卡状态 ===== */
+let lv=null;
+function rand(n){ return Math.floor(Math.random()*n); }
+function shuffle(a){ for(let i=a.length-1;i>0;i--){ const j=rand(i+1);[a[i],a[j]]=[a[j],a[i]]; } return a; }
+
+function enterLevel(target){
+  ac();
+  // 这关的候选 = 全部4种风（已知品类）。盒子=4种风各一个，打乱位置
+  let pool=[...WINDS];
+  let hasHidden = Math.random()<CFG.hiddenChance && !collected[HIDDEN.id];
+  if(hasHidden) pool.push(HIDDEN);
+  pool=shuffle(pool.map(w=>({ real:w, guess:null, shakes:CFG.freeShakes })));
+  lv={ target, boxes:pool, current:-1, hasHidden, candidates:[...WINDS, ...(hasHidden?[HIDDEN]:[])] };
+
+  document.getElementById('gameTtl').textContent='辨别关 · 找出「'+target.name+'」';
+  document.getElementById('targetName').textContent=target.name;
+  document.getElementById('targetGlyph').innerHTML=windGlyph(target,24);
+  document.getElementById('targetGlyph').style.background='transparent';
+  document.getElementById('targetMode').textContent = hasHidden ? '找出它 + 全部辨对才能拿隐藏款' : '在下面的盒子里找出它';
+  document.getElementById('clueBanner').classList.toggle('on', hasHidden);
+
+  renderBoxes(); selectBox(-1); updateProg();
+  go('game');
+}
+
+function renderBoxes(){
+  const row=document.getElementById('boxrow'); row.innerHTML='';
+  lv.boxes.forEach((b,i)=>{
+    const el=document.createElement('div');
+    el.className='box'+(lv.current===i?' sel':'')+(lv.shakingIdx===i?' shaking':'');
+    if(lv.shakingIdx===i){
+      const g=b.real.gust;
+      const amp=(4+g*16).toFixed(1)+'px';        // 幅度随强度：微风~5px，龙卷~20px
+      const rot=(2+g*9).toFixed(1)+'deg';
+      const speed=(0.55-g*0.28).toFixed(2)+'s';   // 越强抖得越快
+      el.style.setProperty('--amp',amp);
+      el.style.setProperty('--rot',rot);
+      el.style.animationDuration=speed;
+    }
+    el.onclick=()=>selectBox(i);
+    let inner=`<div class="bid">${i+1}号</div>`;
+    if(b.guess){ inner+=`<div class="glyph">${windGlyph(b.guess,34)}</div><div class="picklabel">${b.guess.name}</div>`; }
+    else { inner+=`<div class="glyph"><span style="font-size:26px;color:var(--gray-d)">?</span></div>`; }
+    el.innerHTML=inner;
+    row.appendChild(el);
+  });
+}
+
+function selectBox(i){
+  lv.current=i; renderBoxes();
+  const sb=document.getElementById('shakeBtn'), wb=document.getElementById('whichBox'), meta=document.getElementById('shakeMeta'), ch=document.getElementById('choices');
+  if(i<0){ wb.textContent='先点上方一个盒子'; sb.disabled=true; meta.innerHTML='　'; ch.innerHTML=''; return; }
+  const b=lv.boxes[i];
+  wb.innerHTML=`正在探测 <b>${i+1}号盒</b> — 看它抖得凶不凶 + 听声音，和别的盒对比`;
+  sb.disabled=false; meta.textContent=`剩余摇晃 ${b.shakes} 次`;
+  renderChoices();
+}
+function renderChoices(){
+  const ch=document.getElementById('choices'); ch.innerHTML='';
+  const b=lv.boxes[lv.current];
+  lv.candidates.forEach(w=>{
+    const el=document.createElement('div'); el.className='choice'+(b.guess&&b.guess.id===w.id?' sel':'');
+    el.innerHTML=`<span class="cg">${windGlyph(w,18)}</span>${w.name}`;
+    el.onclick=()=>{ b.guess=w; renderBoxes(); renderChoices(); updateProg(); };
+    ch.appendChild(el);
+  });
+}
+function shakeCur(){
+  const i=lv.current; if(i<0) return; const b=lv.boxes[i];
+  if(b.shakes<=0){
+    if(!b.adUsed){ showAd('看广告 +2 次摇晃',()=>{ b.adUsed=true; b.shakes+=2; selectBox(i); toast('已 +2 次摇晃'); }); }
+    else toast('这盒摇晃次数用完了');
+    return;
+  }
+  b.shakes--; lv.shakingIdx=i; renderBoxes();
+  const wave=document.getElementById('wave'); wave.classList.add('play');
+  playWind(b.real);
+  setTimeout(()=>{ lv.shakingIdx=null; renderBoxes(); wave.classList.remove('play'); }, b.real.dur*1000);
+  document.getElementById('shakeMeta').textContent=`剩余摇晃 ${b.shakes} 次`;
+}
+function updateProg(){
+  const done=lv.boxes.filter(b=>b.guess).length;
+  document.getElementById('gameProg').textContent=`已押 ${done}/${lv.boxes.length}`;
+  const cb=document.getElementById('confirmBtn');
+  cb.disabled=done<lv.boxes.length;
+  cb.textContent=done<lv.boxes.length?`确认整组（还差 ${lv.boxes.length-done}）`:'确认整组 ✓';
+}
+
+function confirmSet(){
+  let correct=0; lv.boxes.forEach(b=>{ if(b.guess&&b.guess.id===b.real.id) correct++; });
+  const total=lv.boxes.length;
+  const targetBox=lv.boxes.find(b=>b.real.id===lv.target.id);
+  const targetHit = targetBox && targetBox.guess && targetBox.guess.id===lv.target.id;
+  const allRight = correct===total;
+  showResult(correct,total,targetHit,allRight);
+}
+
+function showResult(correct,total,targetHit,allRight){
+  go('result');
+  document.getElementById('ringBig').textContent=correct+'/'+total;
+  const ring=document.getElementById('ring');
+  ring.style.background = targetHit ? 'var(--mint-d)' : 'var(--bad)';
+  // 主目标成功判定
+  document.getElementById('verdict').textContent = targetHit ? `找到「${lv.target.name}」！` : `没找对「${lv.target.name}」`;
+
+  const rev=document.getElementById('reveal'); rev.innerHTML='';
+  lv.boxes.forEach((b,i)=>{
+    const ok=b.guess&&b.guess.id===b.real.id;
+    const el=document.createElement('div'); el.className='rc';
+    el.innerHTML=`<div class="bid" style="font-size:11px;color:var(--sub)">${i+1}号</div><div class="gl">${windGlyph(b.real,30)}</div><div style="font-size:11px">${b.real.name}</div><div class="${ok?'ok':'no'}">${ok?'✓':'✗'}</div>`;
+    rev.appendChild(el);
+  });
+
+  const gw=document.getElementById('goldWrap'); gw.innerHTML='';
+  const rb=document.getElementById('rbtns'); rb.innerHTML='';
+
+  if(targetHit){
+    collected[lv.target.id]=true; // 收下目标
+    // 隐藏款：明牌 + 必须全对
+    if(lv.hasHidden){
+      if(allRight){ collected[HIDDEN.id]=true; gw.innerHTML=`<div class="gold-pop">🎉 全辨对！隐藏款「台风」收入囊中 ★</div>`; }
+      else { gw.innerHTML=`<div style="font-size:13px;color:var(--sub)">目标拿到了，但没全辨对，隐藏款溜走了（下次再遇）</div>`; }
+    }
+    rb.appendChild(mkBtn('回收集墙看看','primary',()=>{ renderWall(); go('wall'); }));
+    if(WINDS.some(w=>!collected[w.id])) rb.appendChild(mkBtn('继续收集下一个','mint',()=>{ renderWall(); go('wall'); }));
+  } else {
+    rb.appendChild(mkBtn('本关重来（次数回满）','mint',()=>{ enterLevel(lv.target); }));
+    rb.appendChild(mkBtn('放弃回收集墙','ghost',()=>{ renderWall(); go('wall'); }));
+  }
+}
+
+function mkBtn(t,c,fn){ const b=document.createElement('button'); b.className='btn '+c; b.textContent=t; b.onclick=fn; return b; }
+function showAd(label,cb){ toast(label+'…（模拟 1.5 秒）'); setTimeout(()=>cb&&cb(),1400); }
+function go(id){ document.querySelectorAll('.screen').forEach(s=>s.classList.remove('on')); document.getElementById(id).classList.add('on'); }
+let tT; function toast(m){ const t=document.getElementById('toast'); t.textContent=m; t.classList.add('on'); clearTimeout(tT); tT=setTimeout(()=>t.classList.remove('on'),1800); }
+
+renderWall();
+</script>
+</body>
+</html>
