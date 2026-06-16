@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>摇盒验证 v4 · 真实音效基因系统</title>
+<title>摇盒验证 v5 · 物理基因系统</title>
 <style>
   *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent;user-select:none}
   :root{--bg:#0F0E0D;--card:#1C1A18;--card2:#252220;--ink:#E8E0D8;--sub:#8C8178;--line:rgba(232,224,216,.08);--a2:#C9A86C;--gold:#E0A91E;--good:#3FA683;--bad:#E07A6B;--purp:#9B8EC4}
@@ -24,7 +24,7 @@
   .pbtns button{flex:1;border:none;border-radius:8px;padding:6px;font-size:10px;font-weight:700;cursor:pointer;background:var(--card2);color:var(--sub);transition:all .15s}
   .pbtns button.on{background:var(--a2);color:#1a1400}
 
-  .grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+  .grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px}
   .fig{background:var(--card);border-radius:14px;padding:10px 8px 8px;display:flex;flex-direction:column;align-items:center;gap:4px;position:relative;border:1px solid var(--line);transition:border-color .2s}
   .fig:hover{border-color:rgba(201,168,108,.25)}
   .fig .nm{font-size:12px;font-weight:800;text-align:center;line-height:1.15}
@@ -65,9 +65,9 @@
 </head>
 <body>
 <div class="wrap">
-  <h1>摇盒验证 v4 · 真实音效基因</h1>
-  <div class="sub">基于 3 段真实盲盒录音（clean），用<b>音效基因参数</b>做实时差异化处理。同一个录音底 → 不同基因 = 不同手感。<b>戴耳机、开震动。</b></div>
-  <div class="tag">3段真实录音 × 7维基因变换 = 无限差异</div>
+  <h1>摇盒验证 v5 · 物理基因</h1>
+  <div class="sub">角色物理特征 → 4维盒内状态 → 自动推导7维音频基因 → 摇盒音色。<b>戴耳机、开震动。</b></div>
+  <div class="tag">4维物理基因 × 公式推导 = 角色音色</div>
 
   <div class="knobs">
     <div class="kr"><label>差异度<span>5款差多远</span></label><input type="range" id="kS" min="0" max="100" value="80"><div class="v" id="vS">80</div></div>
@@ -86,45 +86,72 @@
 
   <div class="divider"></div>
   <div class="foot">
-    <b>音效基因七维参数</b>：<br>
-    · source（选哪段录音做底） → pitch（半音偏移：负=沉闷，正=轻快）<br>
-    · speed（播放速率：<1慢=重/满，>1快=轻/空）<br>
-    · eqLow（低频增益：+=空洞共鸣，-=闷实）<br>
-    · eqHigh（高频增益：+=清脆配件感，-=蒙住）<br>
-    · reverb（混响干湿：0=紧实，大=空洞回响）<br>
-    · volume（音量：满盒极低，空盒高）<br>
-    · <b>三件套同步</b>：声音撞击点 → 震动buzz → 动画冲击放大，帧级对齐
+    <b>4维物理基因 → 7维音频参数</b>：<br>
+    · fill（填充度：0=空 1=塞满）→ volume↓ 晃幅↓ 沉闷↑<br>
+    · rattle（松散度：0=固定 1=散乱）→ eqHigh↑ 撞击↑<br>
+    · damping（阻尼：0=裸放 1=厚包装）→ eqHigh↓ reverb↓ 整体闷<br>
+    · size（体型：0=迷你 1=大型）→ eqLow↑ pitch↓ speed↓<br>
+    · <b>角色特征决定盒内物理状态 → 物理状态决定音色</b>
   </div>
 </div>
 <div class="toast" id="toast"></div>
 
 <script>
-/* ===== 音效基因定义 =====
-   source: 用哪段 clean 音效做底 (0/1/2)
-   pitch: 半音偏移 (-6~+6)
-   speed: 播放速率 (0.6~1.4)
-   eqLow: 低频增益 dB (-12~+6)
-   eqHigh: 高频增益 dB (-12~+6)
-   reverb: 混响干湿比 (0~0.5)
-   volume: 基础音量 (0.1~1.0)
+/* ===== 物理基因定义 =====
+   fill:    盒内填充度 (0=空 1=塞满) → 音量↓ 晃幅↓ 沉闷↑
+   rattle:  内容松散度 (0=固定 1=散乱) → 高频脆响↑ 撞击↑
+   damping: 内衬阻尼   (0=裸放 1=厚包装) → 高频↓ 回响↓ 整体闷
+   size:    角色体型   (0=迷你 1=大型) → 低频↑ 音调↓ 速度↓
 */
-const GENES = [
-  { id:'full',   name:'满盒大款',   emoji:'🐻', color:'#3D2E4C', lid:'#5A4070',
-    desc:'沉、闷、短——摇不动',
-    gene:{ source:0, pitch:-4, speed:0.70, eqLow:-8, eqHigh:-6, reverb:0,    volume:0.20 }},
-  { id:'access', name:'配件款',     emoji:'🤖', color:'#1E3A32', lid:'#2D5A48',
-    desc:'中等+清脆高频——咔哒咔哒',
-    gene:{ source:2, pitch:+2, speed:1.00, eqLow:-2, eqHigh:+4, reverb:0.10, volume:0.70 }},
-  { id:'empty',  name:'空盒轻量款', emoji:'🐱', color:'#3A2A1E', lid:'#5C4030',
-    desc:'轻、空、回响——六面晃',
-    gene:{ source:1, pitch:+4, speed:1.30, eqLow:+4, eqHigh:+2, reverb:0.35, volume:0.90 }},
-  { id:'wing',   name:'翅膀配件款', emoji:'🦋', color:'#2A2A3E', lid:'#404060',
-    desc:'偏重但有脆点——头重偶尔叮',
-    gene:{ source:0, pitch:-1, speed:0.85, eqLow: 0, eqHigh:+3, reverb:0.08, volume:0.55 }},
-  { id:'base',   name:'底座独立款', emoji:'🍄', color:'#1E2E3A', lid:'#304858',
-    desc:'偏空+闷+回响——闷盒砸底',
-    gene:{ source:2, pitch:-3, speed:0.80, eqLow:+2, eqHigh:-3, reverb:0.20, volume:0.60 }},
+const BOXES = [
+  { id:'pip',     name:'Pip',     emoji:'🐰', color:'#3A2A1E', lid:'#5C4030',
+    desc:'轻小空晃',
+    phys:{ fill:0.10, rattle:0.70, damping:0.10, size:0.15 }},
+  { id:'mochi',   name:'Mochi',   emoji:'🐱', color:'#2E2E3A', lid:'#484860',
+    desc:'软圆微空',
+    phys:{ fill:0.20, rattle:0.40, damping:0.15, size:0.25 }},
+  { id:'biscuit', name:'Biscuit', emoji:'🤖', color:'#1E3A32', lid:'#2D5A48',
+    desc:'配件咔哒',
+    phys:{ fill:0.40, rattle:0.85, damping:0.15, size:0.50 }},
+  { id:'lumi',    name:'Lumi',    emoji:'🦋', color:'#2A2A3E', lid:'#404060',
+    desc:'翅膀扑腾',
+    phys:{ fill:0.35, rattle:0.65, damping:0.10, size:0.30 }},
+  { id:'creme',   name:'Crème',   emoji:'🧁', color:'#3D2E4C', lid:'#5A4070',
+    desc:'蓬松微脆',
+    phys:{ fill:0.30, rattle:0.30, damping:0.20, size:0.35 }},
+  { id:'daisy',   name:'Daisy',   emoji:'🌻', color:'#3A3020', lid:'#5A4830',
+    desc:'花饰轻碰',
+    phys:{ fill:0.35, rattle:0.50, damping:0.15, size:0.40 }},
+  { id:'hugo',    name:'Hugo',    emoji:'🐻', color:'#1A1A24', lid:'#2A2A3E',
+    desc:'极沉摇不动',
+    phys:{ fill:0.92, rattle:0.05, damping:0.30, size:0.95 }},
+  { id:'rex',     name:'Rex',     emoji:'🦖', color:'#1E2820', lid:'#304838',
+    desc:'沉重闷响',
+    phys:{ fill:0.80, rattle:0.10, damping:0.25, size:0.80 }},
+  { id:'mystery', name:'Mystery', emoji:'✨', color:'#2A1E30', lid:'#403050',
+    desc:'神秘未知',
+    phys:{ fill:0.50, rattle:0.20, damping:0.40, size:0.55 }},
 ];
+
+/* ===== 物理基因 → 音频基因 公式 ===== */
+function physToGene(p) {
+  const f = p.fill, r = p.rattle, d = p.damping, s = p.size;
+  return {
+    source:  r > 0.5 ? 2 : (f < 0.3 ? 1 : 0),
+    pitch:   Math.round((1 - s) * 8 + r * 3 - f * 4 - 6),
+    speed:   +(0.6 + (1 - f) * 0.5 + r * 0.3).toFixed(2),
+    eqLow:   Math.round((1 - f) * 10 + s * 2 - 6),
+    eqHigh:  Math.round(r * 12 - d * 10 - 2),
+    reverb:  +(Math.max(0, (1 - f) * (1 - d) * 0.5)).toFixed(2),
+    volume:  +Math.max(0.1, (1 - f) * 0.8 + r * 0.2).toFixed(2),
+  };
+}
+
+// 预计算每个盒子的音频基因
+const GENES = BOXES.map(b => {
+  const gene = physToGene(b.phys);
+  return { ...b, gene };
+});
 
 // 基因中心点（spread=0 时所有盒收敛到此）
 const GENE_CENTER = { source:1, pitch:0, speed:1.0, eqLow:-2, eqHigh:0, reverb:0.12, volume:0.55 };
@@ -249,7 +276,7 @@ function shake(idx) {
   // 2) Gain (volume)
   const gain = ctx.createGain();
   const vol = Math.max(0.05, Math.min(1.0, g.volume));
-  gain.gain.setValueAtTime(vol * 0.7, t0);
+  gain.gain.setValueAtTime(vol * 2.1, t0);
 
   // 3) Low shelf EQ
   const lowShelf = ctx.createBiquadFilter();
@@ -447,7 +474,7 @@ function render() {
     el.innerHTML = `
       <div class="nm">${f.name}</div>
       <div class="ds">${f.desc}</div>
-      <div class="gn">src${ge.source} p${ge.pitch} sp${ge.speed} lo${ge.eqLow} hi${ge.eqHigh} rv${ge.reverb} vol${ge.volume}</div>
+      <div class="gn">f${f.phys.fill} r${f.phys.rattle} d${f.phys.damping} s${f.phys.size}<br>→p${ge.pitch} sp${ge.speed} lo${ge.eqLow} hi${ge.eqHigh} rv${ge.reverb} v${ge.volume}</div>
       <div class="bv" id="vis${i}" style="background:${f.color}"><div class="lid" style="background:${f.lid}"></div><div class="gl">${f.emoji}</div></div>
       <div class="ro" id="ro${i}">还没摇</div>
       <button class="sbtn" id="btn${i}" onclick="shake(${i})">摇一摇</button>`;
